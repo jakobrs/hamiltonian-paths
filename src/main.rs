@@ -6,14 +6,16 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 
 const L: usize = 8;
 
-type T = u32;
-type ST = i32;
+type T = u64;
+type ST = i64;
 type V = Simd<T, L>;
 type M = Mask<ST, L>;
 
 #[inline(always)]
-fn test_bit(x: V, u: T) -> M {
-    (x << (31 - u)).cast::<ST>().is_negative()
+fn test_bit(x: V, u: u32) -> M {
+    (x << (T::BITS as T - 1 - u as T))
+        .cast::<ST>()
+        .is_negative()
 }
 
 #[inline(always)]
@@ -33,14 +35,14 @@ fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[Vec<u32>; N]) ->
     assert!(N != 0);
     assert!(N <= 31);
 
-    let sum: V = (0..(1 as T) << N)
+    let sum: V = (0..1u32 << N)
         .into_par_iter()
         .step_by(L * 2)
         .map(|mask_idx| {
             let mask = V::from_array({
-                let mut mask_data = [mask_idx; L];
+                let mut mask_data = [mask_idx as T; L];
                 for i in 0..L {
-                    mask_data[i] += 2 * i as u32;
+                    mask_data[i] += 2 * i as T;
                 }
                 mask_data
             });
