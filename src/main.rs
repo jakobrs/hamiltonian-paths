@@ -35,12 +35,12 @@ fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[(u32, u32)]) -> 
 
     let sum: V = (0..(1 as T) << N)
         .into_par_iter()
-        .step_by(L)
+        .step_by(L * 2)
         .map(|mask_idx| {
             let mask = V::from_array({
                 let mut mask_data = [mask_idx; L];
                 for i in 0..L {
-                    mask_data[i] += i as u32;
+                    mask_data[i] += 2 * i as u32;
                 }
                 mask_data
             });
