@@ -26,7 +26,7 @@ fn add<const M: T>(x: V, y: V) -> V {
     s.select(z - V::splat(M), z)
 }
 
-fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[Vec<u32>]) -> T {
+fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[Vec<u32>; N]) -> T {
     if N == 1 {
         return edges.len() as T;
     }
@@ -51,19 +51,36 @@ fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[Vec<u32>]) -> T 
 
             for _ in 0..N {
                 for (u, vs) in edges.iter().enumerate() {
-                    let mut acc = V::splat(0);
+                    if (1 << u) < 2 * L {
+                        let mut acc = V::splat(0);
 
-                    for &v in vs {
-                        let mut count = acc + old[v as usize];
-                        if M != 0 {
-                            let reducible = count.simd_ge(V::splat(M));
-                            count = reducible.select(count - V::splat(M), count);
+                        for &v in vs {
+                            let mut count = acc + old[v as usize];
+                            if M != 0 {
+                                let reducible = count.simd_ge(V::splat(M));
+                                count = reducible.select(count - V::splat(M), count);
+                            }
+                            let cleared = test_bit(mask, u as u32);
+                            acc = cleared.select(acc, count);
                         }
-                        let cleared = test_bit(mask, u as u32);
-                        acc = cleared.select(acc, count);
-                    }
 
-                    new[u as usize] = acc;
+                        new[u as usize] = acc;
+                    } else {
+                        // can this be merged with the above?
+                        let mut acc = V::splat(0);
+
+                        if (mask_idx >> u) & 1 == 0 {
+                            for &v in vs {
+                                acc = acc + old[v as usize];
+                                if M != 0 {
+                                    let reducible = acc.simd_ge(V::splat(M));
+                                    acc = reducible.select(acc - V::splat(M), acc);
+                                }
+                            }
+                        }
+
+                        new[u as usize] = acc;
+                    }
                 }
 
                 old = new;
@@ -91,10 +108,13 @@ fn main() {
     std::io::stdin().read_to_string(&mut input).unwrap();
     let mut words = input.split_ascii_whitespace();
 
+    const N: usize = 30;
+
     let n: usize = words.next().unwrap().parse().unwrap();
+    assert!(n == N);
     let m: usize = words.next().unwrap().parse().unwrap();
 
-    let mut edges: Vec<Vec<u32>> = vec![vec![]; n];
+    let mut edges = [const { vec![] }; N];
     for _ in 0..m {
         let u: usize = words.next().unwrap().parse().unwrap();
         let v = words.next().unwrap().parse().unwrap();
@@ -102,12 +122,12 @@ fn main() {
         edges[u].push(v);
     }
 
-    let c = count_hamiltonian_paths::<30, 1_000_000_007>(&edges);
+    let c = count_hamiltonian_paths::<N, 1_000_000_007>(&edges);
     println!("{c} mod 1e9+7");
-    let c = count_hamiltonian_paths::<30, 1_000_000_009>(&edges);
+    let c = count_hamiltonian_paths::<N, 1_000_000_009>(&edges);
     println!("{c} mod 1e9+9");
-    let c = count_hamiltonian_paths::<30, 1_000_000_021>(&edges);
+    let c = count_hamiltonian_paths::<N, 1_000_000_021>(&edges);
     println!("{c} mod 1e9+21");
-    let c = count_hamiltonian_paths::<30, 0>(&edges);
+    let c = count_hamiltonian_paths::<N, 0>(&edges);
     println!("{c} mod 2^32");
 }
