@@ -26,7 +26,7 @@ fn add<const M: T>(x: V, y: V) -> V {
     s.select(z - V::splat(M), z)
 }
 
-fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[(u32, u32)]) -> T {
+fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[Vec<u32>]) -> T {
     if N == 1 {
         return edges.len() as T;
     }
@@ -50,17 +50,20 @@ fn count_hamiltonian_paths<const N: usize, const M: T>(edges: &[(u32, u32)]) -> 
             old[0] = V::splat(1);
 
             for _ in 0..N {
-                new.fill(V::splat(0));
+                for (u, vs) in edges.iter().enumerate() {
+                    let mut acc = V::splat(0);
 
-                for &(u, v) in edges {
-                    let mut count = new[u as usize] + old[v as usize];
-                    if M != 0 {
-                        let reducible = count.simd_ge(V::splat(M));
-                        count = reducible.select(count - V::splat(M), count);
+                    for &v in vs {
+                        let mut count = acc + old[v as usize];
+                        if M != 0 {
+                            let reducible = count.simd_ge(V::splat(M));
+                            count = reducible.select(count - V::splat(M), count);
+                        }
+                        let cleared = test_bit(mask, u as u32);
+                        acc = cleared.select(acc, count);
                     }
-                    let cleared = test_bit(mask, u);
-                    count = cleared.select(new[u as usize], count);
-                    new[u as usize] = count;
+
+                    new[u as usize] = acc;
                 }
 
                 old = new;
@@ -88,15 +91,15 @@ fn main() {
     std::io::stdin().read_to_string(&mut input).unwrap();
     let mut words = input.split_ascii_whitespace();
 
-    let _n: usize = words.next().unwrap().parse().unwrap();
+    let n: usize = words.next().unwrap().parse().unwrap();
     let m: usize = words.next().unwrap().parse().unwrap();
 
-    let mut edges = vec![];
+    let mut edges: Vec<Vec<u32>> = vec![vec![]; n];
     for _ in 0..m {
-        let u: u32 = words.next().unwrap().parse().unwrap();
+        let u: usize = words.next().unwrap().parse().unwrap();
         let v = words.next().unwrap().parse().unwrap();
 
-        edges.push((u, v));
+        edges[u].push(v);
     }
 
     let c = count_hamiltonian_paths::<30, 1_000_000_007>(&edges);
